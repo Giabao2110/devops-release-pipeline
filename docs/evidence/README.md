@@ -42,6 +42,11 @@ $ promtool test rules deploy/monitoring/prometheus/alerts_test.yml
 SUCCESS
 ```
 
+Release check on the laptop: downloaded the linux/amd64 archive, `SHA256SUMS` and the bundle;
+`sha256sum -c SHA256SUMS --ignore-missing` returned OK, and `BUILD_INFO.json` inside the
+archive reads `{"version":"0.1.0","commit":"bfe0e7c",...}`. cosign itself is not
+installed locally, so the bundle was verified only by the CI job.
+
 ## Not verified locally
 
 - **GitHub Actions** jobs cannot run on the laptop because they need GitHub's OIDC and runners. They were verified on GitHub instead; see [CI runs](#ci-runs-github-actions) below.
@@ -54,6 +59,7 @@ SUCCESS
 |---|---|---|---|
 | [43830671500](https://github.com/Giabao2110/devops-release-pipeline/actions/runs/43830671500) | `c6a2143` | failure | `image` job could not resolve `sigstore/cosign-installer@v4` (upstream has no floating `v4` tag); every other job passed, including deploy to kind and the rollback drill |
 | [43831229332](https://github.com/Giabao2110/devops-release-pipeline/actions/runs/43831229332) | `e105cd0` | **success** | pinned `cosign-installer@v4.1.3`; all 10 jobs green, release job skipped (not a tag) |
+| [43832048576](https://github.com/Giabao2110/devops-release-pipeline/actions/runs/43832048576) | tag `v0.1.0` (`bfe0e7c`) | **success** | all 11 jobs green including the release job, which published [v0.1.0](https://github.com/Giabao2110/devops-release-pipeline/releases/tag/v0.1.0): 4 archives, `SHA256SUMS` and the cosign bundle `SHA256SUMS.sigstore.json` (verified with `cosign verify-blob` in the job) |
 
 From run 43831229332 (`pipeline-metrics` and `deploy-events` artifacts):
 
