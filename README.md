@@ -166,7 +166,7 @@ trimmed output are in [`docs/evidence/`](docs/evidence/README.md).
 | Error-rate alert | `ERROR_RATE=0.2` drill: 243 of 1264 requests failed, `ReleaseDemoHighErrorRate` fired after its 5-minute window; reverted with `rollout undo` |
 | Build matrix (local) | 4/4 targets packaged, `sha256sum -c` OK |
 | Terraform | `fmt -check`, `validate` and offline `plan` (26 to add); **never applied** |
-| GitHub Actions, GHCR push, cosign signing | see the Actions tab; status is noted in `docs/evidence/README.md` |
+| GitHub Actions (all jobs), GHCR push, cosign keyless sign + verify | green on GitHub ([run 43831229332](https://github.com/Giabao2110/devops-release-pipeline/actions/runs/43831229332)); the first run failed on an unpinnable action tag, fixed in the next commit |
 
 ## Limitations
 

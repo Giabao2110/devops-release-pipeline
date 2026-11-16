@@ -86,8 +86,9 @@ Chỉ nói những gì đã chạy thật. Xem bảng "Đã/chưa kiểm chứng
 - **Verify:** `cosign verify` với `--certificate-identity-regexp` (đúng repo và
   workflow) và `--certificate-oidc-issuer` (GitHub). Release thì ký file
   `SHA256SUMS` bằng `cosign sign-blob --bundle`.
-- **Trung thực:** phần này chỉ chạy được trên GitHub Actions. Xem trạng thái CI
-  ở cuối tài liệu.
+- **Đã chạy thật trên GitHub Actions** (run 43831229332). Log có dòng
+  "Verification for ghcr.io/giabao2110/devops-release-pipeline@sha256:...", nghĩa là đã
+  kiểm tra transparency log và chuỗi chứng chỉ.
 
 ## 5. GitHub Actions (`.github/workflows/ci.yml`)
 
@@ -269,7 +270,7 @@ Quy trình chung khi pod lỗi:
 | Prometheus/Grafana/Pushgateway trên kind, alert rollback firing | Đã chạy, có ảnh dashboard |
 | Build 4 nền tảng + checksum (local) | Đã chạy |
 | Terraform fmt/validate/plan offline | Đã chạy; **chưa apply** |
-| GitHub Actions, GHCR, cosign keyless | Chỉ chạy khi repo lên GitHub; xem `docs/evidence/README.md` |
+| GitHub Actions, GHCR, cosign keyless | Đã chạy trên GitHub 16/11: run 43831229332 xanh 10/10 job, image ký và verify trong job. Lần đầu hỏng do tag `cosign-installer@v4` không tồn tại, đã sửa. Kể được như một bài học: nên pin version chính xác |
 | HPA scale thật | Chưa (thiếu metrics-server) |
 | EKS, AWS thật | Chưa làm |
 

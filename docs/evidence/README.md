@@ -44,13 +44,26 @@ SUCCESS
 
 ## Not verified locally
 
-- **GitHub Actions** (`ci.yml`): GHCR push, cosign keyless signing and verification, the
-  multi-arch buildx image, the job-timing/failure-rate report and the release job
-  need GitHub's OIDC and runners. The result of the first runs is recorded below
-  once the repository is pushed.
+- **GitHub Actions** jobs cannot run on the laptop because they need GitHub's OIDC and runners. They were verified on GitHub instead; see [CI runs](#ci-runs-github-actions) below.
 - **HPA scaling:** metrics-server is not installed in kind, so the HPA shows `<unknown>`.
 - **AWS:** nothing was applied; only `validate` and an offline `plan`.
 
-## CI runs
+## CI runs (GitHub Actions)
 
-_Not run yet at the time of writing._
+| Run | Commit | Result | Notes |
+|---|---|---|---|
+| [43830671500](https://github.com/Giabao2110/devops-release-pipeline/actions/runs/43830671500) | `c6a2143` | failure | `image` job could not resolve `sigstore/cosign-installer@v4` (upstream has no floating `v4` tag); every other job passed, including deploy to kind and the rollback drill |
+| [43831229332](https://github.com/Giabao2110/devops-release-pipeline/actions/runs/43831229332) | `e105cd0` | **success** | pinned `cosign-installer@v4.1.3`; all 10 jobs green, release job skipped (not a tag) |
+
+From run 43831229332 (`pipeline-metrics` and `deploy-events` artifacts):
+
+- Build matrix: 4/4 targets, mean 11.5 s per target (max 13 s).
+- Job timing: 10 jobs, 0 failed, wall clock about 201 s. The longest job is deploy to kind + rollback drill (146 s).
+- Workflow history at that point: 1 earlier completed run, which had failed, so the failure rate was 100% of 1 run. The metric counts only runs completed before the metrics job.
+- Deploy events in CI:
+  - `0.0.0-dev.2+e105cd0` → `success`;
+  - the `-drill` release with `FAIL_MODE=unhealthy` → `rolled_back` after the 60 s rollout timeout.
+- Image `ghcr.io/giabao2110/devops-release-pipeline@sha256:b51ac4170a81662d218209be2deb3ff8145b59b50d10ad36652b952e91f4a4d2`:
+  - pushed for linux/amd64 and linux/arm64;
+  - signed with cosign keyless; `cosign verify` in the same job checked the transparency-log entry and the certificate chain;
+  - anonymous pull of the manifest from GHCR returned HTTP 200, so the package is public.
