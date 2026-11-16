@@ -1,0 +1,40 @@
+# Drill 2: Service selector does not match pod labels -> no endpoints, requests fail.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: lab-selector
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: web
+  namespace: lab-selector
+spec:
+  replicas: 2
+  selector:
+    matchLabels: { app.kubernetes.io/name: web }
+  template:
+    metadata:
+      labels: { app.kubernetes.io/name: web }
+    spec:
+      securityContext: { runAsNonRoot: true, seccompProfile: { type: RuntimeDefault } }
+      containers:
+        - name: app
+          image: release-demo:1.1.0
+          ports: [{ name: http, containerPort: 8080 }]
+          readinessProbe: { httpGet: { path: /readyz, port: http }, periodSeconds: 5 }
+          resources:
+            limits: { cpu: 100m, memory: 32Mi }
+          securityContext: { allowPrivilegeEscalation: false, capabilities: { drop: ["ALL"] } }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: web
+  namespace: lab-selector
+spec:
+  selector:
+    app.kubernetes.io/name: web-app     # BUG: pods are labelled "web"
+  ports:
+    - port: 80
+      targetPort: http

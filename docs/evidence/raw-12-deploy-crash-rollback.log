@@ -1,0 +1,32 @@
+$ PUSHGATEWAY_URL=http://127.0.0.1:9091 scripts/deploy.sh release-demo:1.3.0 1.3.0 --fail-mode crash
+[deploy 08:02:50] current: release-demo:1.2.0 (revision 5) -> target: release-demo:1.3.0 (1.3.0) [FAIL_MODE=crash]
+deployment.apps/release-demo patched
+Waiting for deployment "release-demo" rollout to finish: 1 out of 2 new replicas have been updated...
+error: timed out waiting for the condition
+[deploy 08:03:51] DEPLOY FAILED: rollout did not become ready within 60s
+[deploy 08:03:51] diagnostics (newest pods):
+NAME                            READY   STATUS             RESTARTS      AGE     IP            NODE                        NOMINATED NODE   READINESS GATES
+release-demo-585564cf5f-jttvh   0/1     CrashLoopBackOff   3 (17s ago)   60s     10.244.0.19   release-lab-control-plane   <none>           <none>
+release-demo-9b949b77b-5v7kh    1/1     Running            0             2m43s   10.244.0.17   release-lab-control-plane   <none>           <none>
+release-demo-9b949b77b-zs79z    1/1     Running            0             2m33s   10.244.0.18   release-lab-control-plane   <none>           <none>
+60s         Normal    Scheduled                      pod/release-demo-585564cf5f-jttvh      Successfully assigned release-demo/release-demo-585564cf5f-jttvh to release-lab-control-plane
+60s         Normal    SuccessfulCreate               replicaset/release-demo-585564cf5f     Created pod: release-demo-585564cf5f-jttvh
+60s         Normal    ScalingReplicaSet              deployment/release-demo                (combined from similar events): Scaled up replica set release-demo-585564cf5f from 0 to 1
+17s         Warning   Unhealthy                      pod/release-demo-585564cf5f-jttvh      Readiness probe failed: Get "http://10.244.0.19:8080/readyz": dial tcp 10.244.0.19:8080: connect: connection refused
+17s         Normal    Started                        pod/release-demo-585564cf5f-jttvh      Container started
+17s         Normal    Created                        pod/release-demo-585564cf5f-jttvh      Container created
+17s         Normal    Pulled                         pod/release-demo-585564cf5f-jttvh      Container image "release-demo:1.3.0" already present on machine and can be accessed by the pod
+10s         Warning   BackOff                        pod/release-demo-585564cf5f-jttvh      Back-off restarting failed container app in pod release-demo-585564cf5f-jttvh_release-demo(b5e72655-6461-467a-8c89-11b940af6f61)
+[deploy 08:03:52] rolling back to previous revision
+deployment.apps/release-demo rolled back
+deployment "release-demo" successfully rolled out
+smoke test via svc/release-demo (port 24163)
+  ok  GET /healthz -> 200
+  ok  GET /readyz -> 200
+  ok  /metrics exposes app_build_info
+  ok  /version -> 1.2.0
+SMOKE PASS
+[deploy 08:03:54] rollback complete; serving release-demo:1.2.0
+[deploy 08:03:54] result=rolled_back duration=64s (event appended to deploy-events.jsonl)
+[deploy 08:03:54] pushed deploy metrics to http://127.0.0.1:9091
+exit=3

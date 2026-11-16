@@ -1,0 +1,37 @@
+$ kubectl -n lab-crashloop get pods
+NAME                     READY   STATUS             RESTARTS      AGE
+broken-cd98f97c5-p4kpq   0/1     CrashLoopBackOff   2 (27s ago)   59s
+
+$ kubectl -n lab-crashloop describe pod -l app=broken | (State / Last State / Events)
+    State:          Waiting
+      Reason:       CrashLoopBackOff
+    Last State:     Terminated
+      Reason:       Error
+      Exit Code:    1
+      Started:      Mon, 16 Nov 2026 14:53:59 +0700
+      Finished:     Mon, 16 Nov 2026 14:54:00 +0700
+    Ready:          False
+Events:
+  Type     Reason     Age                From               Message
+  ----     ------     ----               ----               -------
+  Normal   Scheduled  61s                default-scheduler  Successfully assigned lab-crashloop/broken-cd98f97c5-p4kpq to release-lab-control-plane
+  Normal   Started    29s (x3 over 59s)  kubelet            Container started
+  Warning  BackOff    29s (x2 over 57s)  kubelet            Back-off restarting failed container app in pod broken-cd98f97c5-p4kpq_lab-crashloop(9c0f3501-94d0-421b-b7a3-49a3725c28e1)
+  Normal   Pulled     3s (x4 over 60s)   kubelet            Container image "release-demo:1.1.0" already present on machine and can be accessed by the pod
+  Normal   Created    3s (x4 over 60s)   kubelet            Container created
+
+$ kubectl -n lab-crashloop logs deploy/broken --previous
+{"time":"2026-11-16T07:53:59.962865138Z","level":"ERROR","msg":"FAIL_MODE=crash: exiting on purpose to simulate a broken release"}
+
+# fix: remove the bad FAIL_MODE value
+$ kubectl -n lab-crashloop set env deploy/broken FAIL_MODE-
+deployment.apps/broken env updated
+$ kubectl -n lab-crashloop rollout status deploy/broken --timeout=60s
+Waiting for deployment "broken" rollout to finish: 1 old replicas are pending termination...
+Waiting for deployment "broken" rollout to finish: 1 old replicas are pending termination...
+Waiting for deployment "broken" rollout to finish: 1 old replicas are pending termination...
+deployment "broken" successfully rolled out
+$ kubectl -n lab-crashloop get pods
+NAME                      READY   STATUS        RESTARTS      AGE
+broken-68c657c8fd-ktdhc   1/1     Running       0             11s
+broken-cd98f97c5-p4kpq    0/1     Terminating   3 (42s ago)   74s

@@ -1,0 +1,30 @@
+$ kubectl -n lab-selector get pods --show-labels
+NAME                   READY   STATUS    RESTARTS   AGE    LABELS
+web-5d6d694869-kh4ng   1/1     Running   0          101s   app.kubernetes.io/name=web,pod-template-hash=5d6d694869
+web-5d6d694869-zlkt9   1/1     Running   0          101s   app.kubernetes.io/name=web,pod-template-hash=5d6d694869
+
+$ kubectl -n lab-selector get endpointslices -l kubernetes.io/service-name=web
+NAME        ADDRESSTYPE   PORTS     ENDPOINTS   AGE
+web-z9hv4   IPv4          <unset>   <unset>     101s
+
+$ kubectl -n lab-selector port-forward svc/web 18081:80   # symptom
+
+$ kubectl -n lab-selector get svc web -o jsonpath={.spec.selector}
+{"app.kubernetes.io/name":"web-app"}
+$ kubectl -n lab-selector get pods -l app.kubernetes.io/name=web-app
+No resources found in lab-selector namespace.
+
+# fix: point the selector at the real pod label
+$ kubectl -n lab-selector patch svc web --type merge -p '{"spec":{"selector":{"app.kubernetes.io/name":"web"}}}'
+service/web patched
+$ kubectl -n lab-selector get endpointslices -l kubernetes.io/service-name=web
+NAME        ADDRESSTYPE   PORTS   ENDPOINTS                 AGE
+web-z9hv4   IPv4          8080    10.244.0.10,10.244.0.11   114s
+
+$ SERVICE=web NAMESPACE=lab-selector scripts/smoke_test.sh
+smoke test via svc/web (port 21996)
+  ok  GET /healthz -> 200
+  ok  GET /readyz -> 200
+  ok  /metrics exposes app_build_info
+  ok  /version -> 1.1.0
+SMOKE PASS

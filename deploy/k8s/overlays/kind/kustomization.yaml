@@ -1,0 +1,9 @@
+# Local/CI overlay: image is built locally and side-loaded with `kind load`.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - ../../base
+images:
+  - name: release-demo
+    newName: release-demo
+    newTag: dev

@@ -1,0 +1,17 @@
+$ scripts/deploy.sh release-demo:1.1.0 1.1.0
+[deploy 07:51:59] current: release-demo:1.0.0 (revision 1) -> target: release-demo:1.1.0 (1.1.0)
+deployment.apps/release-demo patched
+Waiting for deployment "release-demo" rollout to finish: 1 out of 2 new replicas have been updated...
+Waiting for deployment "release-demo" rollout to finish: 1 out of 2 new replicas have been updated...
+Waiting for deployment "release-demo" rollout to finish: 1 out of 2 new replicas have been updated...
+Waiting for deployment "release-demo" rollout to finish: 1 old replicas are pending termination...
+Waiting for deployment "release-demo" rollout to finish: 1 old replicas are pending termination...
+deployment "release-demo" successfully rolled out
+smoke test via svc/release-demo (port 21881)
+  ok  GET /healthz -> 200
+  ok  GET /readyz -> 200
+  ok  /metrics exposes app_build_info
+  ok  /version -> 1.1.0
+SMOKE PASS
+[deploy 07:52:03] result=success duration=4s (event appended to <repo>/.state/deploy-events.jsonl)
+exit=0

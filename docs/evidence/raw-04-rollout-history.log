@@ -1,0 +1,6 @@
+deployment.apps/release-demo 
+REVISION  CHANGE-CAUSE
+1         bootstrap 1.0.0 (release-demo:1.0.0)
+3         deploy 1.2.0 (release-demo:1.2.0)
+4         deploy 1.1.0 (release-demo:1.1.0)
+

@@ -1,0 +1,19 @@
+$ PUSHGATEWAY_URL=http://127.0.0.1:9091 scripts/deploy.sh release-demo:1.2.0 1.2.0
+[deploy 08:01:08] current: release-demo:1.1.0 (revision 4) -> target: release-demo:1.2.0 (1.2.0)
+deployment.apps/release-demo patched
+Waiting for deployment "release-demo" rollout to finish: 1 out of 2 new replicas have been updated...
+Waiting for deployment "release-demo" rollout to finish: 1 out of 2 new replicas have been updated...
+Waiting for deployment "release-demo" rollout to finish: 1 out of 2 new replicas have been updated...
+Waiting for deployment "release-demo" rollout to finish: 1 old replicas are pending termination...
+Waiting for deployment "release-demo" rollout to finish: 1 old replicas are pending termination...
+deployment "release-demo" successfully rolled out
+smoke test via svc/release-demo (port 27635)
+  ok  GET /healthz -> 200
+  ok  GET /readyz -> 200
+  ok  /metrics exposes app_build_info
+  ok  /version -> 1.2.0
+SMOKE PASS
+[deploy 08:01:28] result=success duration=20s (event appended to deploy-events.jsonl)
+curl: (22) The requested URL returned error: 400
+[deploy 08:01:28] WARN: could not push metrics to http://127.0.0.1:9091
+exit=0

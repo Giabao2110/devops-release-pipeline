@@ -1,0 +1,52 @@
+packaged release-demo_0.1.0-dev.local_linux_amd64.tar.gz (2580802 bytes) in 29s
+6444fef59ad323ec266fd6deb96a69d818120cb7a04097a57101591ebd5acb94 *release-demo_0.1.0-dev.local_linux_amd64.tar.gz
+packaged release-demo_0.1.0-dev.local_linux_arm64.tar.gz (2321490 bytes) in 26s
+8401df8eaad6e7084c6d403fb4ac7336ef701fc5a3ae33b58684ebff99cd0a63 *release-demo_0.1.0-dev.local_linux_arm64.tar.gz
+Python was not found; run without arguments to install from the Microsoft Store, or disable this shortcut from Settings > Apps > Advanced app settings > App execution aliases.
+stat: cannot stat '': No such file or directory
+sha256sum: '': No such file or directory
+/usr/bin/bash: line 1: printf: 0.1.0-dev.local: invalid number
+packaged release-demo_0.1.0-dev.local_darwin_arm64.tar.gz (2392930 bytes) in 28s
+e769a4549b86b49f04058c9f0da35c5f3be4122eca5488da8265da42132218d8 *release-demo_0.1.0-dev.local_darwin_arm64.tar.gz
+
+$ (cd dist && cat *.sha256 > SHA256SUMS && sha256sum -c SHA256SUMS)
+release-demo_0.1.0-dev.local_darwin_arm64.tar.gz: OK
+release-demo_0.1.0-dev.local_linux_amd64.tar.gz: OK
+release-demo_0.1.0-dev.local_linux_arm64.tar.gz: OK
+
+$ python scripts/pipeline_metrics.py builds --input-dir dist/records --markdown dist/summary.md
+### Build matrix
+3/4 targets built, failure rate 25.0%, mean build 28.8s
+
+| target | status | build (s) | size (KiB) | sha256 |
+|---|---|---:|---:|---|
+| darwin-arm64 | success | 28 | 2336 | `e769a4549b86` |
+| linux-amd64 | success | 30 | 2520 | `6444fef59ad3` |
+| linux-arm64 | success | 26 | 2267 | `8401df8eaad6` |
+| windows-amd64 | failure | 31 | 0 | `local05` |
+
+
+# re-run windows/amd64 after fixing the zip fallback in package.sh
+packaged release-demo_0.1.0-dev.local_windows_amd64.zip (2668386 bytes) in 9s
+d4ee456ac67882282effb76b6f3ed57bdda591683b710fc8b30c3a67962b28d4 *release-demo_0.1.0-dev.local_windows_amd64.zip
+release-demo_0.1.0-dev.local_darwin_arm64.tar.gz: OK
+release-demo_0.1.0-dev.local_linux_amd64.tar.gz: OK
+release-demo_0.1.0-dev.local_linux_arm64.tar.gz: OK
+release-demo_0.1.0-dev.local_windows_amd64.zip: OK
+Archive:  dist/release-demo_0.1.0-dev.local_windows_amd64.zip
+  Length      Date    Time    Name
+---------  ---------- -----   ----
+      115  2026-11-16 15:12   BUILD_INFO.json
+  6295040  2026-11-16 15:12   release-demo.exe
+---------                     -------
+  6295155                     2 files
+### Build matrix
+4/4 targets built, failure rate 0.0%, mean build 23.5s
+
+| target | status | build (s) | size (KiB) | sha256 |
+|---|---|---:|---:|---|
+| darwin-arm64 | success | 28 | 2336 | `e769a4549b86` |
+| linux-amd64 | success | 30 | 2520 | `6444fef59ad3` |
+| linux-arm64 | success | 26 | 2267 | `8401df8eaad6` |
+| windows-amd64 | success | 10 | 2605 | `d4ee456ac678` |
+

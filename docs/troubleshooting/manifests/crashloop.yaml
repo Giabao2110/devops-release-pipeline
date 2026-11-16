@@ -1,0 +1,29 @@
+# Drill 1: a release that exits on start -> CrashLoopBackOff.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: lab-crashloop
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: broken
+  namespace: lab-crashloop
+spec:
+  replicas: 1
+  selector:
+    matchLabels: { app: broken }
+  template:
+    metadata:
+      labels: { app: broken }
+    spec:
+      securityContext: { runAsNonRoot: true, seccompProfile: { type: RuntimeDefault } }
+      containers:
+        - name: app
+          image: release-demo:1.1.0
+          env:
+            - name: FAIL_MODE
+              value: crash          # the "bad config" we will find and fix
+          resources:
+            limits: { cpu: 100m, memory: 32Mi }
+          securityContext: { allowPrivilegeEscalation: false, capabilities: { drop: ["ALL"] } }

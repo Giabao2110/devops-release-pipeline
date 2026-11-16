@@ -1,0 +1,336 @@
+name: ci
+
+# One pipeline for every change:
+#   test -> version -> build matrix (4 platforms, checksums) -> image (multi-arch, GHCR, cosign)
+#   -> deploy to an ephemeral kind cluster with smoke test + rollback drill
+#   -> pipeline metrics (build time, failure rate) -> GitHub Release on v* tags (signed checksums)
+on:
+  push:
+    branches: [main]
+    tags: ["v*.*.*"]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+
+env:
+  GO_VERSION: "1.26"
+  PROMETHEUS_IMAGE: prom/prometheus:v3.16.0
+  KIND_VERSION: v0.33.0
+
+jobs:
+  test:
+    name: lint & test
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: false # no third-party modules
+      - name: gofmt / go vet
+        working-directory: app
+        run: |
+          test -z "$(gofmt -l .)" || { gofmt -d .; exit 1; }
+          go vet ./...
+      - name: Go unit tests (race detector + coverage)
+        working-directory: app
+        run: |
+          go test -race -count=1 -coverprofile=coverage.out ./...
+          go tool cover -func=coverage.out | tail -n 1 | tee -a "$GITHUB_STEP_SUMMARY"
+      - name: Python tests (pipeline metrics)
+        run: python3 -m unittest discover -s tests -v
+      - name: shellcheck
+        run: shellcheck scripts/*.sh
+      - name: Alert rules (promtool check + unit tests)
+        run: |
+          docker run --rm -v "$PWD/deploy/monitoring/prometheus:/rules" -w /rules \
+            --entrypoint promtool "$PROMETHEUS_IMAGE" check rules alerts.yml
+          docker run --rm -v "$PWD/deploy/monitoring/prometheus:/rules" -w /rules \
+            --entrypoint promtool "$PROMETHEUS_IMAGE" test rules alerts_test.yml
+      - name: Kubernetes manifests render (kustomize)
+        run: |
+          kubectl kustomize deploy/k8s/overlays/kind > /dev/null
+          kubectl kustomize deploy/monitoring > /dev/null
+
+  iac:
+    name: terraform validate & offline plan
+    runs-on: ubuntu-24.04
+    defaults:
+      run:
+        working-directory: infra/terraform/aws
+    steps:
+      - uses: actions/checkout@v7
+      - uses: hashicorp/setup-terraform@v4
+        with:
+          terraform_wrapper: false
+      - run: terraform fmt -check -recursive
+      - run: terraform init -input=false -backend=false
+      - run: terraform validate
+      - name: Offline plan (fake credentials, no AWS API calls, never applied)
+        run: |
+          terraform plan -var-file=offline.tfvars -input=false -refresh=false -lock=false -no-color \
+            | tee plan.txt | tail -n 3
+          echo "### Terraform offline plan" >> "$GITHUB_STEP_SUMMARY"
+          grep -E '^Plan:' plan.txt >> "$GITHUB_STEP_SUMMARY"
+
+  version:
+    runs-on: ubuntu-24.04
+    outputs:
+      version: ${{ steps.v.outputs.VERSION }}
+      image_tag: ${{ steps.v.outputs.IMAGE_TAG }}
+      commit: ${{ steps.v.outputs.COMMIT }}
+      build_date: ${{ steps.v.outputs.BUILD_DATE }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0 # tags are needed for git describe
+      - id: v
+        run: |
+          scripts/version.sh | tee -a "$GITHUB_OUTPUT"
+          { echo "### Version"; echo '```'; scripts/version.sh; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+
+  build:
+    name: build ${{ matrix.goos }}/${{ matrix.goarch }}
+    needs: [test, version]
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { goos: linux, goarch: amd64 }
+          - { goos: linux, goarch: arm64 }
+          - { goos: windows, goarch: amd64 }
+          - { goos: darwin, goarch: arm64 }
+    env:
+      VERSION: ${{ needs.version.outputs.version }}
+      COMMIT: ${{ needs.version.outputs.commit }}
+      BUILD_DATE: ${{ needs.version.outputs.build_date }}
+      TARGET: ${{ matrix.goos }}-${{ matrix.goarch }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: false
+      - name: Build, package, checksum (timed)
+        run: |
+          mkdir -p dist records
+          start=$(date +%s); status=success
+          scripts/package.sh "${{ matrix.goos }}" "${{ matrix.goarch }}" || status=failure
+          end=$(date +%s)
+          archive=$(ls dist/*.tar.gz dist/*.zip 2>/dev/null | head -n 1 || true)
+          size=0; sha=""
+          if [[ -n "$archive" ]]; then size=$(stat -c %s "$archive"); sha=$(sha256sum "$archive" | cut -d' ' -f1); fi
+          printf '{"target":"%s","status":"%s","duration_seconds":%d,"size_bytes":%d,"sha256":"%s","version":"%s","commit":"%s"}\n' \
+            "$TARGET" "$status" $((end - start)) "$size" "$sha" "$VERSION" "$COMMIT" > "records/build-$TARGET.json"
+          cat "records/build-$TARGET.json"
+          [[ "$status" == success ]]
+      - uses: actions/upload-artifact@v7
+        with:
+          name: dist-${{ env.TARGET }}
+          path: dist/
+          if-no-files-found: error
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: build-record-${{ env.TARGET }}
+          path: records/
+
+  image:
+    name: image (multi-arch, GHCR, cosign)
+    needs: [test, version]
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      packages: write # push to GHCR
+      id-token: write # OIDC token for keyless cosign signing
+    env:
+      VERSION: ${{ needs.version.outputs.version }}
+      IMAGE_TAG: ${{ needs.version.outputs.image_tag }}
+      COMMIT: ${{ needs.version.outputs.commit }}
+      PUSH: ${{ github.event_name != 'pull_request' }}
+    steps:
+      - uses: actions/checkout@v7
+      - id: name
+        run: echo "image=ghcr.io/${GITHUB_REPOSITORY,,}" >> "$GITHUB_OUTPUT"
+      - uses: docker/setup-qemu-action@v4
+      - uses: docker/setup-buildx-action@v4
+      - uses: docker/login-action@v4
+        if: env.PUSH == 'true'
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - id: build
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64
+          push: ${{ env.PUSH == 'true' }}
+          provenance: mode=max
+          sbom: true
+          build-args: |
+            VERSION=${{ env.VERSION }}
+            COMMIT=${{ env.COMMIT }}
+            BUILD_DATE=${{ needs.version.outputs.build_date }}
+          tags: |
+            ${{ steps.name.outputs.image }}:${{ env.IMAGE_TAG }}
+            ${{ steps.name.outputs.image }}:sha-${{ env.COMMIT }}
+            ${{ github.ref == 'refs/heads/main' && format('{0}:latest', steps.name.outputs.image) || '' }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+      - uses: sigstore/cosign-installer@v4
+        if: env.PUSH == 'true'
+      - name: Sign image by digest (keyless) and verify
+        if: env.PUSH == 'true'
+        env:
+          REF: ${{ steps.name.outputs.image }}@${{ steps.build.outputs.digest }}
+        run: |
+          cosign sign --yes "$REF"
+          cosign verify "$REF" \
+            --certificate-identity-regexp "^https://github.com/${GITHUB_REPOSITORY}/.github/workflows/ci.yml@" \
+            --certificate-oidc-issuer https://token.actions.githubusercontent.com > /dev/null
+          {
+            echo "### Image"
+            echo "- \`$REF\`"
+            echo "- tags: \`$IMAGE_TAG\`, \`sha-$COMMIT\`"
+            echo "- signed with cosign keyless (GitHub OIDC), verified in the same job"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  deploy-kind:
+    name: deploy to kind + rollback drill
+    needs: [test, version]
+    runs-on: ubuntu-24.04
+    env:
+      VERSION: ${{ needs.version.outputs.version }}
+      IMAGE_TAG: ${{ needs.version.outputs.image_tag }}
+      COMMIT: ${{ needs.version.outputs.commit }}
+      ENVIRONMENT: ci-kind
+      ROLLOUT_TIMEOUT: 60s
+    steps:
+      - uses: actions/checkout@v7
+      - name: Create kind cluster
+        uses: helm/kind-action@v1
+        with:
+          version: ${{ env.KIND_VERSION }}
+          config: deploy/kind/cluster.yaml
+          cluster_name: release-lab
+      - name: Build baseline and candidate images, load into kind
+        run: |
+          docker build -q -t release-demo:baseline --build-arg VERSION=0.0.0-baseline --build-arg COMMIT="$COMMIT" .
+          docker build -q -t "release-demo:$IMAGE_TAG" --build-arg VERSION="$VERSION" --build-arg COMMIT="$COMMIT" .
+          kind load docker-image release-demo:baseline "release-demo:$IMAGE_TAG" --name release-lab
+      - name: Bootstrap baseline (revision 1)
+        run: scripts/bootstrap.sh release-demo:baseline 0.0.0-baseline
+      - name: Deploy candidate (rolling update + smoke test)
+        run: scripts/deploy.sh "release-demo:$IMAGE_TAG" "$VERSION"
+      - name: Rollback drill (bad release must be rolled back automatically)
+        run: |
+          set +e
+          scripts/deploy.sh "release-demo:$IMAGE_TAG" "${VERSION}-drill" --fail-mode unhealthy
+          rc=$?
+          set -e
+          if [[ $rc -ne 3 ]]; then echo "expected exit 3 (rolled back), got $rc"; exit 1; fi
+          echo "rollback drill passed; verifying the good release still serves traffic"
+          scripts/smoke_test.sh "$VERSION"
+          kubectl -n release-demo rollout history deploy/release-demo
+      - name: Deploy metrics
+        if: always()
+        run: |
+          test -f .state/deploy-events.jsonl || exit 0
+          python3 scripts/pipeline_metrics.py deploys --input .state/deploy-events.jsonl \
+            --markdown "$GITHUB_STEP_SUMMARY" --output deploy-summary.json
+      - name: Diagnostics on failure
+        if: failure()
+        run: |
+          kubectl get all -A
+          kubectl -n release-demo describe deploy/release-demo
+          kubectl -n release-demo get events --sort-by=.lastTimestamp | tail -n 30
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: deploy-events
+          path: |
+            .state/deploy-events.jsonl
+            deploy-summary.json
+          if-no-files-found: ignore
+
+  metrics:
+    name: pipeline metrics
+    needs: [test, iac, build, image, deploy-kind]
+    if: always()
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      actions: read
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/download-artifact@v8
+        with:
+          pattern: build-record-*
+          path: records
+          merge-multiple: true
+      - name: Build matrix timing and failure rate
+        run: |
+          mkdir -p out
+          python3 scripts/pipeline_metrics.py builds --input-dir records \
+            --markdown "$GITHUB_STEP_SUMMARY" --output out/builds.json || echo "no build records"
+      - name: Job timing for this run
+        run: |
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID/attempts/$GITHUB_RUN_ATTEMPT/jobs" > out/jobs-raw.json
+          python3 scripts/pipeline_metrics.py jobs --input out/jobs-raw.json \
+            --markdown "$GITHUB_STEP_SUMMARY" --output out/jobs.json
+      - name: Failure rate over the last 50 runs
+        run: |
+          gh run list --repo "$GITHUB_REPOSITORY" --workflow ci.yml --limit 50 \
+            --json workflowName,status,conclusion,startedAt,updatedAt > out/runs-raw.json
+          python3 scripts/pipeline_metrics.py runs --input out/runs-raw.json \
+            --markdown "$GITHUB_STEP_SUMMARY" --output out/runs.json
+      - uses: actions/upload-artifact@v7
+        with:
+          name: pipeline-metrics
+          path: out/
+
+  release:
+    name: GitHub Release (signed checksums)
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [build, image, deploy-kind]
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write # create the release
+      id-token: write # keyless signing of the checksum file
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          pattern: dist-*
+          path: dist
+          merge-multiple: true
+      - name: Combine and verify checksums
+        working-directory: dist
+        run: |
+          cat ./*.sha256 > SHA256SUMS
+          sha256sum -c SHA256SUMS
+      - uses: sigstore/cosign-installer@v4
+      - name: Sign SHA256SUMS (keyless) and verify
+        working-directory: dist
+        run: |
+          cosign sign-blob --yes --bundle SHA256SUMS.sigstore.json SHA256SUMS
+          cosign verify-blob --bundle SHA256SUMS.sigstore.json \
+            --certificate-identity-regexp "^https://github.com/${GITHUB_REPOSITORY}/.github/workflows/ci.yml@" \
+            --certificate-oidc-issuer https://token.actions.githubusercontent.com SHA256SUMS
+      - uses: softprops/action-gh-release@v3
+        with:
+          generate_release_notes: true
+          files: |
+            dist/*.tar.gz
+            dist/*.zip
+            dist/SHA256SUMS
+            dist/SHA256SUMS.sigstore.json

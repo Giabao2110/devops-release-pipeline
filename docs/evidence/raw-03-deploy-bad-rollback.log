@@ -1,0 +1,31 @@
+$ scripts/deploy.sh release-demo:1.2.0 1.2.0 --fail-mode unhealthy
+[deploy 07:52:04] current: release-demo:1.1.0 (revision 2) -> target: release-demo:1.2.0 (1.2.0) [FAIL_MODE=unhealthy]
+deployment.apps/release-demo patched
+Waiting for deployment "release-demo" rollout to finish: 1 out of 2 new replicas have been updated...
+error: timed out waiting for the condition
+[deploy 07:53:05] DEPLOY FAILED: rollout did not become ready within 60s
+[deploy 07:53:05] diagnostics (newest pods):
+NAME                            READY   STATUS    RESTARTS      AGE   IP           NODE                        NOMINATED NODE   READINESS GATES
+release-demo-577cf8848-st9bk    0/1     Running   1 (28s ago)   60s   10.244.0.9   release-lab-control-plane   <none>           <none>
+release-demo-6b4f7887b8-59mz9   1/1     Running   0             64s   10.244.0.8   release-lab-control-plane   <none>           <none>
+release-demo-6b4f7887b8-vq7zd   1/1     Running   0             66s   10.244.0.7   release-lab-control-plane   <none>           <none>
+29s         Normal    Created                        pod/release-demo-577cf8848-st9bk       Container created
+28s         Warning   Unhealthy                      pod/release-demo-577cf8848-st9bk       Readiness probe failed: Get "http://10.244.0.9:8080/readyz": dial tcp 10.244.0.9:8080: connect: connection refused
+28s         Normal    Started                        pod/release-demo-577cf8848-st9bk       Container started
+12s         Warning   FailedGetResourceMetric        horizontalpodautoscaler/release-demo   failed to get cpu utilization: unable to get metrics for resource cpu: unable to fetch metrics from resource metrics API: the server could not find the requested resource (get pods.metrics.k8s.io)
+12s         Warning   FailedComputeMetricsReplicas   horizontalpodautoscaler/release-demo   invalid metrics (1 invalid out of 1), first error is: failed to get cpu resource metric value: failed to get cpu utilization: unable to get metrics for resource cpu: unable to fetch metrics from resource metrics API: the server could not find the requested resource (get pods.metrics.k8s.io)
+1s          Normal    Killing                        pod/release-demo-577cf8848-st9bk       Container app failed liveness probe, will be restarted
+1s          Warning   Unhealthy                      pod/release-demo-577cf8848-st9bk       Readiness probe failed: HTTP probe failed with statuscode: 503
+1s          Warning   Unhealthy                      pod/release-demo-577cf8848-st9bk       Liveness probe failed: HTTP probe failed with statuscode: 503
+[deploy 07:53:06] rolling back to previous revision
+deployment.apps/release-demo rolled back
+deployment "release-demo" successfully rolled out
+smoke test via svc/release-demo (port 29306)
+  ok  GET /healthz -> 200
+  ok  GET /readyz -> 200
+  ok  /metrics exposes app_build_info
+  ok  /version -> 1.1.0
+SMOKE PASS
+[deploy 07:53:09] rollback complete; serving release-demo:1.1.0
+[deploy 07:53:09] result=rolled_back duration=65s (event appended to <repo>/.state/deploy-events.jsonl)
+exit=3

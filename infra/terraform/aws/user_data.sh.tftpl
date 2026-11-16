@@ -1,0 +1,22 @@
+#!/bin/bash
+# Amazon Linux 2023 bootstrap: run the release-demo container as a systemd unit.
+set -euo pipefail
+dnf install -y docker
+systemctl enable --now docker
+cat > /etc/systemd/system/release-demo.service <<UNIT
+[Unit]
+Description=release-demo container
+After=docker.service
+Requires=docker.service
+
+[Service]
+Restart=always
+ExecStartPre=-/usr/bin/docker rm -f release-demo
+ExecStart=/usr/bin/docker run --name release-demo --read-only --user 65532:65532 -p 8080:8080 ${app_image}
+ExecStop=/usr/bin/docker stop release-demo
+
+[Install]
+WantedBy=multi-user.target
+UNIT
+systemctl daemon-reload
+systemctl enable --now release-demo

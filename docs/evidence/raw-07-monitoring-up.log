@@ -1,0 +1,27 @@
+namespace/monitoring created
+created Secret monitoring/grafana-admin (read it with: kubectl -n monitoring get secret grafana-admin -o jsonpath='{.data.password}' | base64 -d)
+namespace/monitoring unchanged
+serviceaccount/prometheus created
+clusterrole.rbac.authorization.k8s.io/prometheus-discovery created
+clusterrolebinding.rbac.authorization.k8s.io/prometheus-discovery created
+configmap/grafana-dashboard-provider-k7d2kb67t7 created
+configmap/grafana-dashboards-6fmkk9c9dc created
+configmap/grafana-datasources-7ch2g4cf62 created
+configmap/prometheus-config-gf4cf8m5d6 created
+service/grafana created
+service/prometheus created
+service/pushgateway created
+deployment.apps/grafana created
+deployment.apps/prometheus created
+deployment.apps/pushgateway created
+Waiting for deployment "prometheus" rollout to finish: 0 of 1 updated replicas are available...
+deployment "prometheus" successfully rolled out
+Waiting for deployment "pushgateway" rollout to finish: 0 of 1 updated replicas are available...
+deployment "pushgateway" successfully rolled out
+Waiting for deployment "grafana" rollout to finish: 0 of 1 updated replicas are available...
+deployment "grafana" successfully rolled out
+Monitoring is up. In separate terminals:
+  kubectl -n monitoring port-forward svc/prometheus 9090:9090
+  kubectl -n monitoring port-forward svc/grafana 3000:3000
+  kubectl -n monitoring port-forward svc/pushgateway 9091:9091   # then: export PUSHGATEWAY_URL=http://127.0.0.1:9091
+exit=0

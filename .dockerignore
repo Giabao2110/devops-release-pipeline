@@ -1,0 +1,4 @@
+*
+!app/go.mod
+!app/*.go
+app/*_test.go

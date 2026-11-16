@@ -1,0 +1,17 @@
+$ scripts/bootstrap.sh release-demo:1.0.0 1.0.0
+namespace/release-demo created
+service/release-demo created
+deployment.apps/release-demo created
+poddisruptionbudget.policy/release-demo created
+horizontalpodautoscaler.autoscaling/release-demo created
+deployment.apps/release-demo annotated
+Waiting for deployment "release-demo" rollout to finish: 0 of 2 updated replicas are available...
+Waiting for deployment "release-demo" rollout to finish: 1 of 2 updated replicas are available...
+deployment "release-demo" successfully rolled out
+smoke test via svc/release-demo (port 27388)
+  ok  GET /healthz -> 200
+  ok  GET /readyz -> 200
+  ok  /metrics exposes app_build_info
+  ok  /version -> 1.0.0
+SMOKE PASS
+exit=0

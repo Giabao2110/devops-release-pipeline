@@ -1,0 +1,35 @@
+# Prometheus API checks (2026-11-16T08:05:38Z)
+
+## Scrape targets
+    prometheus   up
+    pushgateway   up
+    release-demo release-demo-9b949b77b-5v7kh 1.2.0 up
+    release-demo release-demo-9b949b77b-zs79z 1.2.0 up
+
+## sum(app_ready{job="release-demo"})
+    {} 2
+
+## count by (version) (app_build_info{job="release-demo"})
+    {'version': '1.2.0'} 2
+
+## sum by (code) (increase(http_requests_total{job="release-demo",route="/api/work"}[10m]))
+    {'code': '200'} 479.3492801349917
+
+## histogram_quantile(0.95, sum by (le) (rate(http_request_duration_seconds_bucket{job="release-demo"}[5m])))
+    {} 0.004761240693877509
+
+## release_deployments_total
+    {'__name__': 'release_deployments_total', 'environment': 'kind', 'job': 'release_pipeline', 'result': 'rollback_failed'} 0
+    {'__name__': 'release_deployments_total', 'environment': 'kind', 'job': 'release_pipeline', 'result': 'rolled_back'} 2
+    {'__name__': 'release_deployments_total', 'environment': 'kind', 'job': 'release_pipeline', 'result': 'success'} 2
+
+## sum(release_deployments_total{result!="success"}) / sum(release_deployments_total)
+    {} 0.5
+
+## Alerts (ALERTS series / rule state)
+    DeploymentRolledBack firing {'environment': 'kind', 'job': 'release_pipeline', 'result': 'rolled_back', 'severity': 'info'}
+    RollbackRateHigh firing {'environment': 'kind', 'severity': 'warning'}
+
+## Rule groups loaded
+    release-demo.app ['ReleaseDemoDown:inactive', 'ReleaseDemoHighErrorRate:inactive', 'ReleaseDemoHighLatencyP95:inactive']
+    release-demo.delivery ['DeploymentRolledBack:firing', 'RollbackRateHigh:firing']

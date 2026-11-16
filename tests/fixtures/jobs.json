@@ -1,0 +1,6 @@
+{"total_count": 4, "jobs": [
+  {"name": "test", "status": "completed", "conclusion": "success", "started_at": "2026-11-16T03:00:00Z", "completed_at": "2026-11-16T03:01:00Z"},
+  {"name": "build (linux, amd64)", "status": "completed", "conclusion": "success", "started_at": "2026-11-16T03:01:00Z", "completed_at": "2026-11-16T03:02:30Z"},
+  {"name": "deploy-kind", "status": "completed", "conclusion": "failure", "started_at": "2026-11-16T03:02:00Z", "completed_at": "2026-11-16T03:05:00Z"},
+  {"name": "metrics", "status": "in_progress", "conclusion": null, "started_at": "2026-11-16T03:05:00Z", "completed_at": null}
+]}

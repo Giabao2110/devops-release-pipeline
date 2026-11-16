@@ -1,0 +1,24 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: monitoring
+resources:
+  - namespace.yaml
+  - prometheus/rbac.yaml
+  - prometheus/deployment.yaml
+  - pushgateway.yaml
+  - grafana/deployment.yaml
+configMapGenerator:
+  # alerts.yml is the same file promtool tests in CI: one source of truth.
+  - name: prometheus-config
+    files:
+      - prometheus/prometheus.yml
+      - prometheus/alerts.yml
+  - name: grafana-datasources
+    files:
+      - grafana/datasources.yaml
+  - name: grafana-dashboard-provider
+    files:
+      - grafana/dashboard-provider.yaml
+  - name: grafana-dashboards
+    files:
+      - grafana/dashboards/release-demo.json

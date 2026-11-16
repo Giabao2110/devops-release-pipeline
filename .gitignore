@@ -1,0 +1,13 @@
+# local tool binaries (kind, terraform) downloaded for the lab
+.tools/
+dist/
+.state/
+*.tfstate
+*.tfstate.*
+.terraform/
+*.tfplan
+tfplan*
+crash.log
+__pycache__/
+*.pyc
+kubeconfig*

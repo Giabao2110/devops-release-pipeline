@@ -1,0 +1,61 @@
+groups:
+  - name: release-demo.app
+    rules:
+      - alert: ReleaseDemoDown
+        expr: sum(up{job="release-demo"}) == 0 or absent(up{job="release-demo"})
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: No release-demo pod is being scraped successfully
+          description: All release-demo targets are down or missing for 2 minutes.
+
+      - alert: ReleaseDemoHighErrorRate
+        expr: |
+          (
+            sum(rate(http_requests_total{job="release-demo",code=~"5.."}[5m]))
+            /
+            sum(rate(http_requests_total{job="release-demo"}[5m]))
+          ) > 0.05
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: release-demo 5xx ratio above 5%
+          description: '{{ $value | humanizePercentage }} of requests failed over the last 5 minutes.'
+
+      - alert: ReleaseDemoHighLatencyP95
+        expr: |
+          histogram_quantile(0.95,
+            sum by (le) (rate(http_request_duration_seconds_bucket{job="release-demo"}[5m]))
+          ) > 0.5
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: release-demo p95 latency above 500ms
+
+  - name: release-demo.delivery
+    rules:
+      - alert: DeploymentRolledBack
+        expr: increase(release_deployments_total{result=~"rolled_back|rollback_failed"}[15m]) > 0
+        labels:
+          severity: info
+        annotations:
+          summary: 'A deployment to {{ $labels.environment }} was rolled back ({{ $labels.result }})'
+          description: Check the pipeline run and the deploy event log before re-releasing.
+
+      - alert: RollbackRateHigh
+        expr: |
+          (
+            sum by (environment) (release_deployments_total{result!="success"})
+            /
+            sum by (environment) (release_deployments_total)
+          ) > 0.3
+          and on (environment)
+          sum by (environment) (release_deployments_total) >= 3
+        for: 0m
+        labels:
+          severity: warning
+        annotations:
+          summary: 'More than 30% of deployments to {{ $labels.environment }} needed a rollback'
