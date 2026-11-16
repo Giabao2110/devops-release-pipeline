@@ -185,7 +185,7 @@ jobs:
             ${{ github.ref == 'refs/heads/main' && format('{0}:latest', steps.name.outputs.image) || '' }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
-      - uses: sigstore/cosign-installer@v4
+      - uses: sigstore/cosign-installer@v4.1.3 # no floating major tag upstream
         if: env.PUSH == 'true'
       - name: Sign image by digest (keyless) and verify
         if: env.PUSH == 'true'
@@ -318,7 +318,7 @@ jobs:
         run: |
           cat ./*.sha256 > SHA256SUMS
           sha256sum -c SHA256SUMS
-      - uses: sigstore/cosign-installer@v4
+      - uses: sigstore/cosign-installer@v4.1.3 # no floating major tag upstream
       - name: Sign SHA256SUMS (keyless) and verify
         working-directory: dist
         run: |
